@@ -25,6 +25,7 @@ git clone git@github.com:jamespet77/SaitekX55-joydev.git
 Navigate into the cloned directory and run `make` to compile the driver:
 
 cd SaitekX55-joydev
+
 make
 
 This will create a `joydev.ko` kernel module file.
@@ -34,6 +35,7 @@ This will create a `joydev.ko` kernel module file.
 To install the new driver, you must first remove the currently loaded `joydev` module and then insert the new one.
 
 sudo rmmod joydev
+
 sudo insmod joydev.ko
 
 After these steps, the Saitek X55 should be detected as a single device. You may need to repeat these steps after a system reboot or if the kernel module is reloaded.
