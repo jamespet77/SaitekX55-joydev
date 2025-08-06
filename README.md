@@ -1,6 +1,6 @@
 # SaitekX55-joydev
 
-This repository contains a custom kernel driver for the Saitek X55 Rhino HOTAS. It fixes an issue where the throttle and stick are detected as two separate devices, preventing proper configuration in some games and applications.
+This repository contains a custom kernel driver for the Saitek X55 Rhino HOTAS. It modifies the Hat0X and Hat0Y to function as a 4-wat switch. This prevented proper configuration in some games and applications.
 
 ## Prerequisites
 
