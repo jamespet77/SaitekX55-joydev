@@ -1,6 +1,6 @@
 # SaitekX55-joydev
 
-This repository contains a custom kernel driver for the Saitek X55 Rhino HOTAS. It modifies the Hat0X and Hat0Y to function as a 4-wat switch. This prevented proper configuration in some games and applications.
+This repository contains a custom kernel driver for the Saitek X55 Rhino HOTAS. It modifies the Hat0X and Hat0Y to function as a 4-way switch. This prevented proper configuration in some games and applications.
 
 ## Prerequisites
 
@@ -38,4 +38,4 @@ sudo rmmod joydev
 
 sudo insmod joydev.ko
 
-After these steps, the Saitek X55 should be detected as a single device. You may need to repeat these steps after a system reboot or if the kernel module is reloaded.
+After these steps, the Saitek X55 Hat should properly function as a switch. You may need to repeat these steps after a system reboot or if the kernel module is reloaded.
