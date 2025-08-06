@@ -109,6 +109,8 @@ static void joydev_pass_event(struct joydev_client *client,
 	kill_fasync(&client->fasync, SIGIO, POLL_IN);
 }
 
+static __u16 current_hat = 0;
+
 static void joydev_event(struct input_handle *handle,
 			 unsigned int type, unsigned int code, int value)
 {
@@ -127,14 +129,56 @@ static void joydev_event(struct input_handle *handle,
 		break;
 
 	case EV_ABS:
-			event.type = JS_EVENT_AXIS;
-			event.number = joydev->absmap[code];
-			event.value = joydev_correct(value,
-					&joydev->corr[event.number]);
-			if (event.value == joydev->abs[event.number])
-				return;
-			joydev->abs[event.number] = event.value;
+		/*
+		 * Convert Hat switch movement to button events.
+		 */
+		if (code == ABS_HAT0X || code == ABS_HAT0Y) {
+			__u16 up = joydev->keymap[BTN_DPAD_UP - BTN_MISC];
+			__u16 down = joydev->keymap[BTN_DPAD_DOWN - BTN_MISC];
+			__u16 left = joydev->keymap[BTN_DPAD_LEFT - BTN_MISC];
+			__u16 right = joydev->keymap[BTN_DPAD_RIGHT - BTN_MISC];
+
+			event.type = JS_EVENT_BUTTON;
+
+			if (code == ABS_HAT0Y) {
+				if (value < 0) {
+					event.number = up;
+					event.value = 1;
+					current_hat = up;
+				} else if (value > 0) {
+					event.number = down;
+					event.value = 1;
+					current_hat = down;
+				} else {
+					event.number = current_hat;
+					event.value = 0;
+				}
+			} else { /* ABS_HAT0X */
+				if (value < 0) {
+					event.number = left;
+					event.value = 1;
+					current_hat = left;
+				} else if (value > 0) {
+					event.number = right;
+					event.value = 1;
+					current_hat = right;
+				} else {
+					event.number = current_hat;
+					event.value = 0;
+				}
+			}
+			joydev->abs[joydev->absmap[code]] = value;
 			break;
+		}
+
+		event.type = JS_EVENT_AXIS;
+		event.number = joydev->absmap[code];
+		event.value = joydev_correct(value,
+				&joydev->corr[event.number]);
+		if (event.value == joydev->abs[event.number])
+			return;
+		joydev->abs[event.number] = event.value;
+		break;
 	default:
 		return;
 	}
@@ -170,6 +214,7 @@ static void joydev_attach_client(struct joydev *joydev,
 	spin_lock(&joydev->client_lock);
 	list_add_tail_rcu(&client->node, &joydev->client_list);
 	spin_unlock(&joydev->client_lock);
+	synchronize_rcu();
 }
 
 static void joydev_detach_client(struct joydev *joydev,
@@ -838,11 +883,11 @@ static bool joydev_dev_is_absolute_mouse(struct input_dev *dev)
 	 * true:
 	 *
 	 * 1) Event types are exactly
-	 *      EV_ABS, EV_KEY and EV_SYN
-	 *    or
-	 *      EV_ABS, EV_KEY, EV_SYN and EV_MSC
-	 *    or
-	 *      EV_ABS, EV_KEY, EV_SYN, EV_MSC and EV_REL.
+	 * EV_ABS, EV_KEY and EV_SYN
+	 * or
+	 * EV_ABS, EV_KEY, EV_SYN and EV_MSC
+	 * or
+	 * EV_ABS, EV_KEY, EV_SYN, EV_MSC and EV_REL.
 	 * 2) Absolute events are exactly ABS_X and ABS_Y.
 	 * 3) Keys are exactly BTN_LEFT, BTN_RIGHT and BTN_MIDDLE.
 	 * 4) Device is not on "Amiga" bus.
@@ -944,6 +989,8 @@ static int joydev_connect(struct input_handler *handler, struct input_dev *dev,
 	joydev->handle.private = joydev;
 
 	for_each_set_bit(i, dev->absbit, ABS_CNT) {
+		if (i == ABS_HAT0X || i == ABS_HAT0Y)
+			continue;
 		joydev->absmap[i] = joydev->nabs;
 		joydev->abspam[joydev->nabs] = i;
 		joydev->nabs++;
@@ -962,6 +1009,23 @@ static int joydev_connect(struct input_handler *handler, struct input_dev *dev,
 			joydev->keypam[joydev->nkey] = i + BTN_MISC;
 			joydev->nkey++;
 		}
+
+	/*
+	 * Map Hat0X and Hat0Y to button events.
+	 */
+	if (test_bit(ABS_HAT0X, dev->absbit)) {
+		joydev->keymap[BTN_DPAD_LEFT - BTN_MISC] = joydev->nkey;
+		joydev->keypam[joydev->nkey++] = BTN_DPAD_LEFT;
+		joydev->keymap[BTN_DPAD_RIGHT - BTN_MISC] = joydev->nkey;
+		joydev->keypam[joydev->nkey++] = BTN_DPAD_RIGHT;
+	}
+	if (test_bit(ABS_HAT0Y, dev->absbit)) {
+		joydev->keymap[BTN_DPAD_UP - BTN_MISC] = joydev->nkey;
+		joydev->keypam[joydev->nkey++] = BTN_DPAD_UP;
+		joydev->keymap[BTN_DPAD_DOWN - BTN_MISC] = joydev->nkey;
+		joydev->keypam[joydev->nkey++] = BTN_DPAD_DOWN;
+	}
+
 
 	for (i = 0; i < joydev->nabs; i++) {
 		j = joydev->abspam[i];
